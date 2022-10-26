@@ -13,7 +13,7 @@ Client side of a social network "Talkee" bootstrapped with [Create React App](ht
 ```
 Go to frontend folder
 ```
-> cd frontend
+> cd talkee-frontend
 ```
 Install project dependencies
 ```
