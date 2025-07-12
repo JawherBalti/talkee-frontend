@@ -34,27 +34,24 @@ function Settings() {
   const navigate = useNavigate();
 
   useEffect(() => {
+  if (currentUserId) {
     dispatch(getCurrentUser(currentUserId));
-    setFirstName(currentUser?.firstName);
-    setFamilyName(currentUser?.familyName);
-    setBio(currentUser.biography);
-    if (currentUser.skills) setSkills(currentUser.skills.split(','));
-    setPreviewPhotoUrl(currentUser.photoUrl);
-    setPreviewBannerUrl(currentUser.bannerUrl);
-    setPhotoUrl(currentUser.photoUrl);
-    setBannerUrl(currentUser.bannerUrl);
-  }, [
-    dispatch,
-    currentUser.photoUrl,
-    currentUser.firstName,
-    currentUser.familyName,
-    currentUser.biography,
-    currentUser.skills,
-    currentUser.previewBannerUrl,
-    currentUser.previewPhotoUrl,
-    currentUser.bannerUrl,
-    currentUserId,
-  ]); //infinite loop because of currentUser
+  }
+}, [dispatch, currentUserId]);
+
+useEffect(() => {
+  if (currentUser) {
+    setFirstName(currentUser.firstName || '');
+    setFamilyName(currentUser.familyName || '');
+    setBio(currentUser.biography || '');
+    setSkills(currentUser.skills ? currentUser.skills.split(',') : []);
+    setPreviewPhotoUrl(currentUser.photoUrl || '');
+    setPreviewBannerUrl(currentUser.bannerUrl || '');
+    setPhotoUrl(currentUser.photoUrl || '');
+    setBannerUrl(currentUser.bannerUrl || '');
+  }
+}, [currentUser]); // Only depend on currentUser
+
 
   const handleKeyDown = (e) => {
     if (e.key !== 'Enter') return;
@@ -112,34 +109,70 @@ function Settings() {
     } else console.log('pwd not matching');
   };
 
-  const submitChangeAvatarHandler = (e) => {
-    e.preventDefault();
-    let formData = new FormData();
-    formData.append('image', photoUrl);
+  const uploadToCloudinary = async (file, type) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'eiqxfhzq'); // Your upload preset
+      //formData.append('folder', 'user_assets'); // Optional folder in Cloudinary
 
-    if (photoUrl) {
-      const updateObj = {
-        userId: currentUser.id,
-        formData,
-      };
-      dispatch(updateAvatar(updateObj));
-      navigate('/profile/' + currentUser.id);
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/dv1lhvgjr/image/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+      return data.secure_url;
+    } catch (error) {
+      console.error(`Error uploading ${type} to Cloudinary:`, error);
+      throw error;
     }
   };
 
-  const submitChangeBannerHandler = (e) => {
+  const submitChangeAvatarHandler = async (e) => {
     e.preventDefault();
-    let formData = new FormData();
-    formData.append('image', bannerUrl);
+    if (!photoUrl || typeof photoUrl === 'string') return;
 
-    if (bannerUrl) {
+    try {
+      const imageUrl = await uploadToCloudinary(photoUrl, 'avatar');
+      
       const updateObj = {
         userId: currentUser.id,
-        formData,
+        formData: {
+          photoUrl: imageUrl,
+          oldPhotoUrl: currentUser.photoUrl, // For deleting old image
+        },
       };
+
+      dispatch(updateAvatar(updateObj));
+      // No need to navigate away - changes will be reflected immediately
+    } catch (error) {
+      console.error('Failed to update avatar:', error);
+    }
+  };
+
+  const submitChangeBannerHandler = async (e) => {
+    e.preventDefault();
+    if (!bannerUrl || typeof bannerUrl === 'string') return;
+
+    try {
+      const imageUrl = await uploadToCloudinary(bannerUrl, 'banner');
+      
+      const updateObj = {
+        userId: currentUser.id,
+        formData: {
+          bannerUrl: imageUrl,
+          oldBannerUrl: currentUser.bannerUrl, // For deleting old image
+        },
+      };
+
       dispatch(updateBanner(updateObj));
-      dispatch(getUser(currentUser.id));
-      navigate('/profile/' + currentUser.id);
+      // No need to navigate away - changes will be reflected immediately
+    } catch (error) {
+      console.error('Failed to update banner:', error);
     }
   };
 
@@ -213,7 +246,7 @@ function Settings() {
                     src={
                       typeof photoUrl === 'object'
                         ? previewPhotoUrl
-                        : imageApi + photoUrl
+                        : photoUrl
                     }
                     alt="attachment"
                     // src={imageApi + preview}
@@ -251,7 +284,7 @@ function Settings() {
                     src={
                       typeof bannerUrl === 'object'
                         ? previewBannerUrl
-                        : imageApi + bannerUrl
+                        : bannerUrl
                     }
                     alt="attachment"
                     // src={imageApi + preview}

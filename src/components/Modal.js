@@ -39,41 +39,82 @@ function Modal(props) {
     param.id,
   ]);
 
-  const updatePost = () => {
-    let formData = new FormData();
-    formData.append('content', postContent);
-    formData.append('image', attachmentUrl);
+  // const updatePost = () => {
+  //   let formData = new FormData();
+  //   formData.append('content', postContent);
+  //   formData.append('image', attachmentUrl);
 
-    let updateObj = {};
+  //   let updateObj = {};
 
-    if (attachmentUrl === null || typeof attachmentUrl === 'string') {
-      updateObj = {
-        postId: props.postId,
-        formData: {
-          content: postContent,
-          attachmentUrl,
-        },
-      };
-      setPostContent(updateObj.formData.content);
-    } else {
-      updateObj = {
-        postId: props.postId,
-        formData,
-      };
+  //   if (attachmentUrl === null || typeof attachmentUrl === 'string') {
+  //     updateObj = {
+  //       postId: props.postId,
+  //       formData: {
+  //         content: postContent,
+  //         attachmentUrl,
+  //       },
+  //     };
+  //     setPostContent(updateObj.formData.content);
+  //   } else {
+  //     updateObj = {
+  //       postId: props.postId,
+  //       formData,
+  //     };
+  //   }
+
+  //   if ((postContent !== '' && !attachmentUrl) || postContent !== '') {
+  //     dispatch(modifyPost(updateObj));
+  //     if (param.id) dispatch(getUserPosts(param.id));
+  //     else dispatch(getFollowedPosts(user.userLogin.user.id));
+
+  //     setPostContent('');
+  //     setAttachmentUrl(null);
+  //     props.closeModal();
+  //   }
+  //   if (param.id) dispatch(getUserPosts(param.id));
+  //   else dispatch(getFollowedPosts(user.userLogin.user.id));
+  // };
+
+const updatePost = async () => {
+  let imageUrl = attachmentUrl;
+  
+  if (attachmentUrl instanceof File) {
+    try {
+      const formData = new FormData();
+      formData.append('file', attachmentUrl);
+      formData.append('upload_preset', 'eiqxfhzq');
+      
+      const response = await fetch('https://api.cloudinary.com/v1_1/dv1lhvgjr/image/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data = await response.json();
+      imageUrl = data.secure_url;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return;
     }
+  }
 
-    if ((postContent !== '' && !attachmentUrl) || postContent !== '') {
-      dispatch(modifyPost(updateObj));
-      if (param.id) dispatch(getUserPosts(param.id));
-      else dispatch(getFollowedPosts(user.userLogin.user.id));
-
-      setPostContent('');
-      setAttachmentUrl(null);
-      props.closeModal();
-    }
-    if (param.id) dispatch(getUserPosts(param.id));
-    else dispatch(getFollowedPosts(user.userLogin.user.id));
+  const updateObj = {
+    postId: props.postId,
+    formData: {
+      content: postContent,
+      attachmentUrl: imageUrl,
+      oldAttachmentUrl: props.post?.attachmentUrl || null,
+    },
   };
+
+  if (postContent !== '' || imageUrl) {
+    try {
+      await dispatch(modifyPost(updateObj)).unwrap();
+      props.closeModal();
+    } catch (error) {
+      console.error('Error updating post:', error);
+    }
+  }
+};
 
   const selectedFile = (e) => {
     setAttachmentUrl(e.target.files[0]);
@@ -130,7 +171,7 @@ function Modal(props) {
             src={
               typeof attachmentUrl === 'object'
                 ? preview
-                : imageApi + attachmentUrl
+                : attachmentUrl
             }
             alt="attachment"
             // src={imageApi + preview}
