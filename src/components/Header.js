@@ -4,7 +4,6 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { findUser, getCurrentUser, logout } from '../features/user/userSlice';
 import LoadingLogo from './LoadingLogo';
 
-const imageApi = 'http://localhost:3001/images/';
 
 function Header() {
   const [toggleMenu, setToggleMenu] = useState(false);
@@ -80,7 +79,7 @@ function Header() {
         <Link to="/" onClick={() => setToggleMenu(false)}>
           <div className="logo">
             <h1>T</h1>
-            <LoadingLogo width={30} height={25} />
+            <LoadingLogo width={30} height={20} />
             <h1>lkee</h1>
           </div>
         </Link>
@@ -163,7 +162,7 @@ function Header() {
                       >
                         <img
                           className="avatar"
-                          src={imageApi + user?.photoUrl}
+                          src={user?.photoUrl}
                           alt="Avatar"
                         />
                         <span>{user.firstName}</span>
@@ -185,7 +184,7 @@ function Header() {
               <img
                 onClick={showHideMenu}
                 className="avatar"
-                src={imageApi + user.currentUser.user.photoUrl}
+                src={user.currentUser.user.photoUrl}
                 alt=""
               />
             )}
@@ -209,7 +208,6 @@ function Header() {
                 <li>
                   <Link
                     onClick={() => {
-                      sessionStorage.clear();
                       document.cookie =
                         'snToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
                       dispatch(logout());
