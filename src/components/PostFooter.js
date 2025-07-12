@@ -21,43 +21,45 @@ function PostFooter(props) {
 
   const react = (postId) => {
     dispatch(reactToPost(postId));
-    // dispatch(getFollowedPosts(user.userLogin.user.id));
-    if (param.id) {
-      dispatch(getUserPosts(param.id));
-    }
-    if (window.location.href.split('0/')[1] === 'explore') {
-      dispatch(getAllPosts());
+    if(!likes.map((like) => like.UserId).includes(props.user.userLogin.user.id)) {
+      setLikes(prevLikes => [...prevLikes, {UserId:props.user.userLogin.user.id}])
+    } else {
+      const likeUserIdIndex = likes.map(like => like.UserId).indexOf(props.user.userLogin.user.id)
+      const newLikes = [...likes];
+      newLikes.splice(likeUserIdIndex,1)
+      setLikes(newLikes)
     }
   };
   return (
-    <div className="post-footer">
-      <div className="likes">
-        {likes?.length &&
-        likes
-          .map((like) => like.UserId)
-          .includes(props.user.userLogin.user.id) ? (
-          <>
-            <i
-              onClick={() => react(props.post.id)}
-              className="fas fa-heart fa-lg like-icon liked"
-            ></i>
-            {likes.length}
-          </>
+    <div className="post-actions">
+      <div className="action-buttons">
+        <button 
+          className={`like-button ${likes?.map(like => like.UserId).includes(props.user.userLogin.user.id) ? 'liked' : ''}`}
+          onClick={() => react(props.post.id)}
+          aria-label={likes?.map(like => like.UserId).includes(props.user.userLogin.user.id) ? 'Unlike' : 'Like'}
+        >
+          <i className="fas fa-heart"></i>
+          {likes.length > 0 && <span className="like-count">{likes.length}</span>}
+        </button>
+        
+        <button 
+          className="comment-button" 
+          onClick={props.toggleComment}
+          aria-label="Toggle comments"
+        >
+          <i className="fas fa-comment"></i>
+        </button>
+      </div>
+      
+      <div className="comment-toggle" onClick={props.toggleComment}>
+        {props.post?.Comments?.length > 0 ? (
+          <span className="comment-count">
+            {props.showOrHide} {props.post.Comments.length} Comment{props.post.Comments.length !== 1 ? 's' : ''}
+          </span>
         ) : (
-          <>
-            <i
-              onClick={() => react(props.post.id)}
-              className="fas fa-heart fa-lg like-icon disliked"
-            ></i>
-            {likes.length}
-          </>
+          <span className="first-comment">Be the first to comment!</span>
         )}
       </div>
-      <p className="show-comments" onClick={props.toggleComment}>
-        {props.post.Comments.length > 0
-          ? `${props.showOrHide}${props.post.Comments.length} Comment(s)`
-          : 'Be the first to comment!'}
-      </p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Comments from './Comments';
 import PostFooter from './PostFooter';
+import CreateComment from './CreateComment';
 
 function ToggleComments(props) {
   const [hideComment, setHideComment] = useState(true);
@@ -18,6 +19,7 @@ function ToggleComments(props) {
         showOrHide={hideComment ? 'Show ' : 'Hide '}
         handleLikesChange={props.handleLikesChange}
       />
+      <CreateComment post={props.post} userId={props.userId} />
       {!hideComment ? <Comments post={props.post} /> : null}
     </div>
   );

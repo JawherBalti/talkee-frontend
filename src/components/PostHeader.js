@@ -52,15 +52,13 @@ function PostHeader(props) {
   return (
     <div className="post-header">
       <div className="post-info-details">
-        <Link to={`/profile/${props.post.User.id}`}>
+        <div className="user-avatar-container" onClick={() => goToProfile(props.post.User.id)}>
           <img
-            className="avatar"
-            src={
-              props.avatar ? props.avatar : imageApi + props.post.User.photoUrl
-            }
+            className="user-avatar"
+            src={props.avatar ? props.avatar : props.post.User.photoUrl}
             alt="user"
           />
-        </Link>
+        </div>
         <div className="post-details">
           <h6
             className="user-info"
@@ -80,27 +78,34 @@ function PostHeader(props) {
           </p>
         </div>
       </div>
-      {user.userLogin.user.id === props.post.User.id ||
-      user.currentUser.user?.role === true ? (
+      {(user.userLogin.user.id === props.post.User.id ||
+      user.currentUser.user?.role === true) && (
         <div className="post-menu">
-          <i
+          <button 
+            className="menu-button"
             onClick={showHideMenu}
-            className="fas fa-ellipsis-h fa-lg post-burger"
-          ></i>
+            aria-label="Post options"
+          >
+            <i className="fas fa-ellipsis-h"></i>
+          </button>
 
-          {toggleMenu ? (
-            <ul className="menu">
-              {user.userLogin.user.id === props.post.User.id ? (
-                <li onClick={openModal}>Modify</li>
-              ) : null}
-              <li onClick={() => postDelete(props.post.id)}>Delete</li>
+          {toggleMenu && (
+            <ul className="dropdown-menu">
+              {user.userLogin.user.id === props.post.User.id && (
+                <li className="dropdown-item" onClick={openModal}>
+                  <i className="fas fa-edit"></i> Edit
+                </li>
+              )}
+              <li className="dropdown-item" onClick={() => postDelete(props.post.id)}>
+                <i className="fas fa-trash"></i> Delete
+              </li>
             </ul>
-          ) : null}
+          )}
         </div>
-      ) : null}
-      {toggleModal ? (
-        <Modal postId={props.post.id} closeModal={closeModal} />
-      ) : null}
+      )}
+      {toggleModal && (
+        <Modal post={props.post} postId={props.post.id} closeModal={closeModal} />
+      )}
     </div>
   );
 }
