@@ -4,18 +4,55 @@ import axios from 'axios';
 const initialState = {
   commentDeleteLoading: false,
   commentDeleteMessage: '',
-  error: '',
+  commentsByPostId: {}, // This must be initialized as an object
+  loading: false,
+  error: null,
 };
 
-const postSlice = createSlice({
+const commentSlice = createSlice({
   name: 'comment',
   initialState,
   reducers: {
-    // createPost: (state, action) => {
-    //   state.user = action.payload;
-    // },
+    // Optional: Add a reset action if needed
+    resetComments: (state) => {
+      state.commentsByPostId = {};
+    }
   },
   extraReducers: (builder) => {
+     builder
+      .addCase(getComments.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getComments.fulfilled, (state, action) => {
+        state.loading = false;
+        const { postId, data } = action.payload;
+        
+        // Ensure commentsByPostId exists
+        if (!state.commentsByPostId) {
+          state.commentsByPostId = {};
+        }
+        
+        // Safely update the state
+        const existingComments = state.commentsByPostId[postId]?.comments || [];
+        
+        state.commentsByPostId = {
+          ...state.commentsByPostId,
+          [postId]: {
+            comments: data.currentPage === 1 
+              ? data.comments 
+              : [...existingComments, ...data.comments],
+            currentPage: data.currentPage,
+            totalPages: data.totalPages,
+            hasMore: data.hasMore
+          }
+        };
+      })
+      .addCase(getComments.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || action.error.message;
+      });
+
     builder.addCase(deleteComment.pending, (state) => {
       state.commentDeleteLoading = true;
     });
@@ -29,7 +66,7 @@ const postSlice = createSlice({
       state.commentDeleteMessage = '';
       state.error = action.error.message;
     });
-  },
+  }
 });
 
 export const deleteComment = createAsyncThunk(
@@ -44,6 +81,20 @@ export const deleteComment = createAsyncThunk(
   }
 );
 
+export const getComments = createAsyncThunk(
+  'comments/getComments',
+  async ({ postId, page = 1 }, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`http://localhost:3001/api/comment/${postId}?page=${page}`);
+      return {
+        postId,
+        data: response.data
+      };
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to load comments');
+    }
+  }
+);
 // export const { logout } = postSlice.actions;
-
-export default postSlice.reducer;
+export const { resetComments } = commentSlice.actions;
+export default commentSlice.reducer;

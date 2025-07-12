@@ -176,10 +176,18 @@ const userSlice = createSlice({
     builder.addCase(updateAvatar.pending, (state) => {
       state.updateUserLoading = true;
     });
+    // builder.addCase(updateAvatar.fulfilled, (state, action) => {
+    //   state.updateUserLoading = false;
+    //   state.message = action.payload;
+    //   state.error = '';
+    // });
     builder.addCase(updateAvatar.fulfilled, (state, action) => {
-      state.updateUserLoading = false;
-      state.message = action.payload;
-      state.error = '';
+      state.loading = false;
+      if (action.payload?.user) {
+        state.currentUser.user = action.payload.user;
+        state.message = action.payload;
+        state.error = '';
+      }
     });
     builder.addCase(updateAvatar.rejected, (state, action) => {
       state.updateUserLoading = false;
@@ -190,10 +198,18 @@ const userSlice = createSlice({
     builder.addCase(updateBanner.pending, (state) => {
       state.updateUserLoading = true;
     });
+    // builder.addCase(updateBanner.fulfilled, (state, action) => {
+    //   state.updateUserLoading = false;
+    //   state.message = action.payload;
+    //   state.error = '';
+    // });
     builder.addCase(updateBanner.fulfilled, (state, action) => {
-      state.updateUserLoading = false;
-      state.message = action.payload;
-      state.error = '';
+      state.loading = false;
+      if (action.payload?.user) {
+        state.currentUser.user = action.payload.user;
+        state.message = action.payload;
+        state.error = '';
+      }
     });
     builder.addCase(updateBanner.rejected, (state, action) => {
       state.updateUserLoading = false;
@@ -445,16 +461,13 @@ export const login = createAsyncThunk('user/login', async (formData) => {
 export const createComment = createAsyncThunk(
   'comment/createComment',
   async (formData) => {
-    const { comment, PostId } = formData;
-    const message = comment;
-    return axios
-      .post('http://localhost:3001/api/comment/' + PostId, { message })
-      .then((res) => {
-        return res.data;
-      })
-      .catch((err) => err.response.data.message);
+    const { PostId, comment } = formData;
+    const response = await axios
+      .post('http://localhost:3001/api/comment/' + PostId, { message: comment })
+    return response.data; // Ensure this includes { id, PostId, UserId, message, createdAt, etc. }
   }
 );
+
 
 export const createPost = createAsyncThunk(
   'post/createPost',

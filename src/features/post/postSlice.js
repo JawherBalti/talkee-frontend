@@ -17,6 +17,16 @@ const initialState = {
   postMessage: '',
   postRecievedMessage: '',
   followedPostsMessage: '',
+  currentPage: 1,
+  totalPages: 1,
+  hasMore: false,
+  userPostsCurrentPage: 1,
+  userPostsTotalPages: 1,
+  userPostsHasMore: false,
+  postsLoading: false,
+  postsCurrentPage: 1,
+  postsTotalPages: 1,
+  postsHasMore: false,
   deleteMessage: '',
   likeMessage: '',
   postUpdatedMessage: '',
@@ -31,17 +41,32 @@ const postSlice = createSlice({
     // },
   },
   extraReducers: (builder) => {
+    // Update the reducer cases
     builder.addCase(getAllPosts.pending, (state) => {
       state.loading = true;
     });
+
     builder.addCase(getAllPosts.fulfilled, (state, action) => {
       state.loading = false;
-      state.postRecievedMessage = 'posts recieved';
-      typeof action.payload === 'string'
-        ? (state.postMessage = action.payload)
-        : (state.posts = action.payload);
+      
+      // If it's the first page, replace posts, otherwise append
+      if (action.payload.currentPage === 1) {
+        state.posts = action.payload.posts;
+      } else {
+        // Filter out duplicates just in case
+        const newPosts = action.payload.posts.filter(
+          newPost => !state.posts.some(post => post.id === newPost.id)
+        );
+        state.posts = [...state.posts, ...newPosts];
+      }
+      
+      state.postsCurrentPage = action.payload.currentPage;
+      state.postsTotalPages = action.payload.totalPages;
+      state.postsHasMore = action.payload.hasMore;
+      state.postRecievedMessage = 'Posts received';
       state.error = '';
     });
+
     builder.addCase(getAllPosts.rejected, (state, action) => {
       state.loading = false;
       state.posts = [];
@@ -49,20 +74,59 @@ const postSlice = createSlice({
       state.error = action.error.message;
     });
 
-    // builder.addCase(createComment.pending, (state) => {
-    //   state.commentLoading = true;
-    // });
-    // builder.addCase(createComment.fulfilled, (state, action) => {
-    //   state.commentLoading = false;
-    //   state.commentCreatedMessage = action.payload;
-    //   state.error = '';
-    // });
-    // builder.addCase(createComment.rejected, (state, action) => {
-    //   state.commentLoading = false;
-    //   state.commentCreatedMessage = '';
-    //   state.error = action.error.message;
-    // });
+// Optimistically add comment
+builder.addCase(createComment.pending, (state, action) => {
+  const { PostId, comment } = action.meta.arg;
+  const tempComment = {
+    id: `temp-${Date.now()}`,
+    message: comment,
+    PostId,
+    pending: true,
+    createdAt: new Date().toISOString(),
+    User: state.user.userLogin.user, // Add current user info
+    UserId: state.user.userLogin.user.id
+  };
 
+  // Helper function to add to any post array
+  const addTempComment = (postArray) => {
+    const post = postArray.find(p => p.id === PostId);
+    if (post) {
+      post.Comments = post.Comments || [];
+      post.Comments.unshift(tempComment);
+    }
+  };
+
+  addTempComment(state.posts);
+  addTempComment(state.userPosts);
+  addTempComment(state.followedPosts);
+});
+
+builder.addCase(createComment.fulfilled, (state, action) => {
+  const { comment: createdComment } = action.payload;
+  const PostId = createdComment.PostId;
+
+  // Helper to replace temp comment
+  const confirmComment = (postArray) => {
+    const post = postArray.find(p => p.id === PostId);
+    if (post?.Comments) {
+      const index = post.Comments.findIndex(c => c.pending);
+      if (index !== -1) {
+        post.Comments[index] = {
+          ...createdComment,
+          pending: false,
+          User: createdComment.User // Ensure user data is included
+        };
+      } else {
+        // If no pending comment found, just add the new one
+        post.Comments.unshift(createdComment);
+      }
+    }
+  };
+
+  confirmComment(state.posts);
+  confirmComment(state.userPosts);
+  confirmComment(state.followedPosts);
+});
     // builder.addCase(createPost.pending, (state) => {
     //   state.postLoading = true;
     // });
@@ -116,8 +180,21 @@ const postSlice = createSlice({
     });
     builder.addCase(getFollowedPosts.fulfilled, (state, action) => {
       state.followedPostsLoading = false;
-      state.followedPosts = action.payload;
-      state.followedPostsMessage = 'Posts Recieved!';
+      
+      if (action.payload.isNewPage) {
+        // Replace posts if it's the first page
+        state.followedPosts = action.payload.posts;
+      } else {
+        // Filter out duplicates before adding new posts
+        const newPosts = action.payload.posts.filter(
+          newPost => !state.followedPosts.some(post => post.id === newPost.id)
+        );
+        state.followedPosts = [...state.followedPosts, ...newPosts];
+      }
+      
+      state.currentPage = action.payload.currentPage;
+      state.totalPages = action.payload.totalPages;
+      state.hasMore = action.payload.hasMore;
       state.error = '';
     });
     builder.addCase(getFollowedPosts.rejected, (state, action) => {
@@ -126,12 +203,25 @@ const postSlice = createSlice({
       state.error = action.error.message;
     });
 
+    // Update the reducer cases
     builder.addCase(getUserPosts.pending, (state) => {
       state.userPostsLoading = true;
     });
     builder.addCase(getUserPosts.fulfilled, (state, action) => {
       state.userPostsLoading = false;
-      state.userPosts = action.payload;
+      // If it's the first page, replace posts, otherwise append
+      if (action.payload.currentPage === 1) {
+        state.userPosts = action.payload.posts;
+      } else {
+        // Filter out duplicates just in case
+        const newPosts = action.payload.posts.filter(
+          newPost => !state.userPosts.some(post => post.id === newPost.id)
+        );
+        state.userPosts = [...state.userPosts, ...newPosts];
+      }
+      state.userPostsCurrentPage = action.payload.currentPage;
+      state.userPostsTotalPages = action.payload.totalPages;
+      state.userPostsHasMore = action.payload.hasMore;
       state.error = '';
     });
     builder.addCase(getUserPosts.rejected, (state, action) => {
@@ -142,12 +232,45 @@ const postSlice = createSlice({
     builder.addCase(modifyPost.pending, (state) => {
       state.updatePostLoading = true;
     });
+
     builder.addCase(modifyPost.fulfilled, (state, action) => {
       state.updatePostLoading = false;
       state.postUpdatedMessage = action.payload;
-      getAllPosts();
       state.error = '';
+      
+      // Get the updated post data from the action meta
+      const { postId, formData } = action.meta.arg;
+      const updatedPost = {
+        content: formData.content,
+        attachmentUrl: formData.attachmentUrl
+      };
+
+      // Helper function to update posts in different arrays
+      const updatePostInArray = (postArray) => {
+        return postArray.map(post => 
+          post.id === postId 
+            ? { ...post, ...updatedPost } 
+            : post
+        );
+      };
+
+      // Update all relevant post lists
+      if (state.posts) {
+        state.posts = updatePostInArray(state.posts);
+      }
+      if (state.userPosts) {
+        state.userPosts = updatePostInArray(state.userPosts);
+      }
+      if (state.followedPosts) {
+        state.followedPosts = updatePostInArray(state.followedPosts);
+      }
+      
+      // Also update the single post if it's the one being edited
+      if (state.post && state.post.id === postId) {
+        state.post = { ...state.post, ...updatedPost };
+      }
     });
+
     builder.addCase(modifyPost.rejected, (state, action) => {
       state.updatePostLoading = false;
       state.postUpdatedMessage = '';
@@ -171,15 +294,18 @@ const postSlice = createSlice({
 
 export const createComment = createAsyncThunk(
   'comment/createComment',
-  async (formData) => {
+  async (formData, { getState }) => {
     const { comment, PostId } = formData;
-    const message = comment;
-    return axios
-      .post('http://localhost:3001/api/comment/' + PostId, { message })
-      .then((res) => {
-        return res.data;
-      })
-      .catch((err) => err.response.data.message);
+    try {
+      const response = await axios.post(
+        `http://localhost:3001/api/comment/${PostId}`,
+        { message: comment }
+      );
+      return response.data;
+    } catch (err) {
+      // Return a standardized error object
+      throw new Error(err.response?.data?.message || 'Failed to create comment');
+    }
   }
 );
 
@@ -194,19 +320,18 @@ export const createComment = createAsyncThunk(
 //       .catch((err) => err.response.data.message);
 //   }
 // );
-
 export const modifyPost = createAsyncThunk(
   'post/modifyPost',
-  async (updateObj) => {
-    return axios
-      .put(
-        'http://localhost:3001/api/post/' + updateObj.postId,
+  async (updateObj, { rejectWithValue }) => {
+    try {
+      const response = await axios.put(
+        `http://localhost:3001/api/post/${updateObj.postId}`,
         updateObj.formData
-      )
-      .then((res) => {
-        return res.data;
-      })
-      .catch((err) => err.response.data.message);
+      );
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to update post');
+    }
   }
 );
 
@@ -222,24 +347,34 @@ export const reactToPost = createAsyncThunk(
   }
 );
 
-export const getAllPosts = createAsyncThunk('post/getAllPosts', async () => {
-  return axios
-    .get('http://localhost:3001/api/post')
-    .then((res) => {
-      return res.data;
-    })
-    .catch((err) => err.response.data.message);
-});
+export const getAllPosts = createAsyncThunk(
+  'post/getAllPosts',
+  async ({ page = 1 } = {}) => {
+    return axios
+      .get(`http://localhost:3001/api/post?page=${page}`, { withCredentials: true })
+      .then((res) => res.data)
+      .catch((err) => {
+        throw new Error(err.response?.data?.message || 'Failed to load posts');
+      });
+  }
+);
 
 export const getFollowedPosts = createAsyncThunk(
   'post/getFollowedPosts',
-  async (userId) => {
+  async ({ userId, page = 1 }, { getState }) => {
+    // If page > 1, we need to calculate the correct offset
+    const adjustedPage = page;
     return axios
-      .get('http://localhost:3001/api/post/followed/' + userId)
-      .then((res) => {
-        return res.data;
+      .get(`http://localhost:3001/api/post/followed/${userId}?page=${adjustedPage}`, { 
+        withCredentials: true 
       })
-      .catch((err) => err.response.data.message);
+      .then((res) => ({
+        ...res.data,
+        isNewPage: page === 1 // Flag to indicate if we're loading a new page
+      }))
+      .catch((err) => {
+        throw new Error(err.response?.data?.message || 'Failed to load posts');
+      });
   }
 );
 
@@ -257,13 +392,13 @@ export const getOnePost = createAsyncThunk(
 
 export const getUserPosts = createAsyncThunk(
   'post/getUserPosts',
-  async (userId) => {
+  async ({ userId, page = 1 }) => {
     return axios
-      .get(`http://localhost:3001/api/post/posts/${userId}`)
-      .then((res) => {
-        return res.data;
-      })
-      .catch((err) => err.response.data.message);
+      .get(`http://localhost:3001/api/post/posts/${userId}?page=${page}`)
+      .then((res) => res.data)
+      .catch((err) => {
+        throw new Error(err.response?.data?.message || 'Failed to load posts');
+      });
   }
 );
 
