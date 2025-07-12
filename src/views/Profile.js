@@ -29,9 +29,20 @@ function Profile() {
   const param = useParams();
   const dispatch = useDispatch();
 
+  const loadMorePosts = () => {
+    if (!post.userPostsHasMore || post.userPostsLoading) return;
+    
+    const nextPage = post.userPostsCurrentPage + 1;
+    dispatch(getUserPosts({ 
+      userId: param.id, 
+      page: nextPage 
+    }));
+  };
+
   useEffect(() => {
+    // Reset to page 1 when user changes
+    dispatch(getUserPosts({ userId: param.id, page: 1 }));
     dispatch(getUser(param.id));
-    dispatch(getUserPosts(param.id));
     dispatch(getCurrentUser(user.userLogin.user.id));
   }, [param.id, dispatch, user.followMessage, user.unfollowMessage]);
 
@@ -49,14 +60,14 @@ function Profile() {
         <div className="profile-header">
           <img
             className="banner"
-            src={imageApi + user.user.user.bannerUrl}
+            src={user.user.user.bannerUrl}
             alt="banner"
           />
           <div className="profile-header-info">
             <div className="profile-user-info">
               <img
                 className="profile-header-avatar"
-                src={imageApi + user.user.user.photoUrl}
+                src={user.user.user.photoUrl}
                 alt="avatar"
               />
               <div className="header-info">
@@ -153,22 +164,37 @@ function Profile() {
             {/* {!post.userPostsLoading ? ( */}
             <>
               {post.userPosts.length ? (
-                post.userPosts.map((p) => (
-                  <div className="post" key={p.id}>
-                    <PostHeader
-                      post={p}
-                      avatar={imageApi + user.user.user?.photoUrl}
-                    />
+                <>
+                {post.userPosts.map((p) => (
+                 <div className="post-card" key={p.id}>
+                    <PostHeader post={p} user={user} />
                     <div className="post-content">
-                      <p>{p.content}</p>
+                      <p className="post-text">{p.content}</p>
                       {p.attachmentUrl && (
-                        <img src={imageApi + p.attachmentUrl} alt="post" />
+                        <div className="post-image-container">
+                          <img
+                            width={500}
+                            src={p.attachmentUrl} 
+                            alt="post" 
+                            className="post-image"
+                            onClick={() => window.open(p.attachmentUrl, '_blank')}
+                          />
+                        </div>
                       )}
                     </div>
                     <ToggleComments post={p} user={user} />
-                    <CreateComment post={p} userId={param.id} />
                   </div>
-                ))
+                ))}
+                {post.userPostsHasMore && (
+                  <button 
+                    onClick={loadMorePosts}
+                    className="load-more-btn"
+                    disabled={post.userPostsLoading}
+                  >
+                    {post.userPostsLoading ? 'Loading...' : 'Show More'}
+                  </button>
+                )}
+              </>
               ) : (
                 <p>No posts ! </p>
               )}
