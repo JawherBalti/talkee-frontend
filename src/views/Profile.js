@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useParams } from 'react-router-dom';
 import CreateComment from '../components/CreateComment';
@@ -25,6 +25,7 @@ const timestampOption = {
 function Profile() {
   const user = useSelector((state) => state.user);
   const post = useSelector((state) => state.post);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const param = useParams();
   const dispatch = useDispatch();
@@ -38,6 +39,14 @@ function Profile() {
       page: nextPage 
     }));
   };
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     // Reset to page 1 when user changes
@@ -101,7 +110,8 @@ function Profile() {
           </div>
         </div>
         <div className="profile-body">
-          <div className="profile-info">
+          {
+          !isMobile && <div className="profile-info">
             <div className="more-info">
               <h6>Information</h6>
               <p>
@@ -160,9 +170,10 @@ function Profile() {
               </p>
             </div>
           </div>
-          <div className="user-posts">
+          }
+          <div className={!isMobile ? "user-posts" : "user-posts-mobile"}>
             {/* {!post.userPostsLoading ? ( */}
-            <>
+            <div>
               {post.userPosts.length ? (
                 <>
                 {post.userPosts.map((p) => (
@@ -198,15 +209,7 @@ function Profile() {
               ) : (
                 <p>No posts ! </p>
               )}
-            </>
-            {/* // ) : (
-               <LoadingSmall
-                 loadingClass="loading-center"
-                 heigth={150}
-                 width={150}
-                 text="Loading data.."
-               />
-             )} */}
+            </div>
           </div>
         </div>
       </div>

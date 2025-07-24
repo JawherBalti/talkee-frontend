@@ -10,11 +10,20 @@ function Header() {
   const [toggleSearch, setToggleSearch] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [usersFound, setUsersFound] = useState([]);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const user = useSelector((state) => state.user);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     setUsersFound(user.usersFound.user);
@@ -75,7 +84,7 @@ function Header() {
 
   return (
     <div className="header">
-      <div>
+      {!isMobile && <div>
         <Link to="/" onClick={() => setToggleMenu(false)}>
           <div className="logo">
             <h1>T</h1>
@@ -83,7 +92,7 @@ function Header() {
             <h1>lkee</h1>
           </div>
         </Link>
-      </div>
+      </div>}
       {!user.userLogin.user ? (
         <ul className="links">
           <li>
