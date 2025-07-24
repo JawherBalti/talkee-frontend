@@ -26,11 +26,17 @@ const conversationSlice = createSlice({
     // },
     receiveMessage: (state, action) => {
       state.oneConversation.push(action.payload);
+      // Also update the conversations array with the new message
+      state.conversations = state.conversations.filter(c => 
+        !(c.firstUserId === action.payload.firstUserId && 
+          c.secondUserId === action.payload.secondUserId)
+      );
+      state.conversations.push(action.payload);
       state.messageReceived =
-        'From ' +
-        action.payload.firstUser.senderId +
-        ' to ' +
-        action.payload.secondUser.receiverId;
+          'From ' +
+          action.payload.firstUser.senderId +
+          ' to ' +
+          action.payload.secondUser.receiverId;
     },
   },
 
