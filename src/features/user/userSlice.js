@@ -5,6 +5,16 @@ axios.defaults.withCredentials = true;
 
 const initialState = {
   user: {},
+
+  followedUsers: [],
+  followedUsersPagination: {
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  },
+
   currentUser: {},
   updatedUser: {},
   isLoggedIn: false,
@@ -18,6 +28,10 @@ const initialState = {
   commentCreatedMessage: '',
   followMessage: '',
   unfollowMessage: '',
+
+  getFollowedUsersError: '',
+  getFollowedUsersLoading: false,
+
   loading: false,
   postLoading: false,
   commentLoading: false,
@@ -44,6 +58,34 @@ const userSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    // Add these cases to your extraReducers builder
+    // Add the reducer cases
+    builder.addCase(getFollowedUsers.pending, (state) => {
+      state.getFollowedUsersLoading = true;
+      state.getFollowedUsersError = '';
+    });
+    // In your extraReducers builder
+    builder.addCase(getFollowedUsers.fulfilled, (state, action) => {
+      state.getFollowedUsersLoading = false;
+      
+      // If loading page 1, replace the list. Otherwise, append to existing list
+      state.followedUsers = action.payload.pagination.currentPage === 1
+        ? action.payload.following
+        : [...state.followedUsers, ...action.payload.following];
+      
+      state.followedUsersPagination = {
+        currentPage: action.payload.pagination.currentPage,
+        totalPages: action.payload.pagination.totalPages,
+        totalCount: action.payload.pagination.totalCount,
+        hasNextPage: action.payload.pagination.hasNextPage,
+        hasPreviousPage: action.payload.pagination.hasPreviousPage,
+      };
+    });
+    builder.addCase(getFollowedUsers.rejected, (state, action) => {
+      state.getFollowedUsersLoading = false;
+      state.getFollowedUsersError = action.payload || 'Failed to fetch followed users';
+    });
+
     builder.addCase(getAllUsers.pending, (state) => {
       state.loading = true;
     });
@@ -68,6 +110,20 @@ const userSlice = createSlice({
       state.error = '';
     });
     builder.addCase(getUser.rejected, (state, action) => {
+      state.userLoading = false;
+      state.user = '';
+      state.error = action.error.message;
+    });
+
+    builder.addCase(getSelectedUser.pending, (state) => {
+      state.userLoading = true;
+    });
+    builder.addCase(getSelectedUser.fulfilled, (state, action) => {
+      state.userLoading = false;
+      state.selectedUser = action.payload.user
+      state.error = '';
+    });
+    builder.addCase(getSelectedUser.rejected, (state, action) => {
       state.userLoading = false;
       state.user = '';
       state.error = action.error.message;
@@ -124,38 +180,12 @@ const userSlice = createSlice({
       state.logoutLoading = false;
       state.userLogin = {};
       state.isLoggedIn = false;
+      state.user = {};
+      state.currentUser = {};
       state.error = '';
     });
     builder.addCase(logout.rejected, (state, action) => {
       state.logoutLoading = false;
-      state.error = action.error.message;
-    });
-
-    builder.addCase(createComment.pending, (state) => {
-      state.commentLoading = true;
-    });
-    builder.addCase(createComment.fulfilled, (state, action) => {
-      state.commentLoading = false;
-      state.commentCreatedMessage = action.payload;
-      state.error = '';
-    });
-    builder.addCase(createComment.rejected, (state, action) => {
-      state.commentLoading = false;
-      state.commentCreatedMessage = '';
-      state.error = action.error.message;
-    });
-
-    builder.addCase(createPost.pending, (state) => {
-      state.postLoading = true;
-    });
-    builder.addCase(createPost.fulfilled, (state, action) => {
-      state.postLoading = false;
-      state.postMessage = action.payload;
-      state.error = '';
-    });
-    builder.addCase(createPost.rejected, (state, action) => {
-      state.postLoading = false;
-      state.postMessage = '';
       state.error = action.error.message;
     });
 
@@ -320,11 +350,33 @@ const userSlice = createSlice({
 
 //createAsyncThunk: automatically dispatch lifecycle actions based on returned promise
 //a promise is either pending, fulfilled or rejected
+// Add this with your other async thunks
+export const getFollowedUsers = createAsyncThunk(
+  'user/getFollowedUsers',
+  async ({ userId, page = 1 }, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3001/api/user/${userId}/following`,
+        { params: { page } }
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || 'Failed to fetch followed users');
+    }
+  }
+);
+
 export const getAllUsers = createAsyncThunk('user/getUsers', () => {
   return axios.get('http://localhost:3001/api/user').then((res) => res.data);
 });
 
 export const getUser = createAsyncThunk('user/getUser', async (userId) => {
+  return axios
+    .get(`http://localhost:3001/api/user/${userId}`)
+    .then((res) => res.data);
+});
+
+export const getSelectedUser = createAsyncThunk('user/getSelectedUser', async (userId) => {
   return axios
     .get(`http://localhost:3001/api/user/${userId}`)
     .then((res) => res.data);
@@ -457,29 +509,6 @@ export const login = createAsyncThunk('user/login', async (formData) => {
     })
     .catch((err) => err.response.data.message);
 });
-
-export const createComment = createAsyncThunk(
-  'comment/createComment',
-  async (formData) => {
-    const { PostId, comment } = formData;
-    const response = await axios
-      .post('http://localhost:3001/api/comment/' + PostId, { message: comment })
-    return response.data; // Ensure this includes { id, PostId, UserId, message, createdAt, etc. }
-  }
-);
-
-
-export const createPost = createAsyncThunk(
-  'post/createPost',
-  async (formData) => {
-    return axios
-      .post('http://localhost:3001/api/post', formData)
-      .then((res) => {
-        return res.data;
-      })
-      .catch((err) => err.response.data.message);
-  }
-);
 
 export const logout = createAsyncThunk('user/logout', async (formData) => {
   return axios
