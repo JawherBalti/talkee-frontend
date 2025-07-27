@@ -20,80 +20,49 @@ import Explore from './views/Explore';
 import Messages from './views/Messages';
 
 function App() {
-  // {!user.isLoggedIn ? (
-  //       <Route path="/login" element={<Login />} />
-  // ) : ()
   const user = useSelector((state) => state.user);
 
   const dispatch = useDispatch();
 
   useEffect(() => {
-    dispatch(getCurrentUser(user.userLogin.id));
-  }, [user.userLogin, dispatch]);
+    if (user.userLogin.id) {
+      dispatch(getCurrentUser(user.userLogin.id));
+    }
+  }, [user.userLogin.id, dispatch]);
 
-  return (
+return (
     <div className="app">
-      <header>
-        <Header></Header>
-      </header>
+      <Header />
       <main>
-        {!user.isLoggedIn ? (
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />}></Route>
-            <Route exact path="/" element={<Home />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        ) : !user.currentUser.user?.isBlocked ? (
-          <Routes>
-            <Route element={<PrivateRoute />}>
-              <Route exact path="/" element={<Home />} />
-            </Route>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={user.isLoggedIn ? <Navigate to="/" /> : <Login />} />
+          <Route path="/signup" element={user.isLoggedIn ? <Navigate to="/" /> : <Signup />} />
+          
+          {/* Protected routes */}
+          <Route element={<PrivateRoute />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/profile/:id" element={<Profile />} />
+            <Route path="/explore" element={<Explore />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/more/:searchValue" element={<MoreResults />} />
+          </Route>
 
-            {/* <Route path="/login" element={<Login />} /> */}
+          {/* Admin routes */}
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/user/:id" element={<AdminSettings />} />
+          </Route>
 
-            <Route path="/signup" element={<Signup />}></Route>
+          {/* Blocked user */}
+          <Route path="/blocked" element={<BlockedUser />} />
 
-            <Route element={<PrivateRoute />}>
-              <Route exact path="/profile/:id" element={<Profile />} />
-            </Route>
-
-            <Route element={<PrivateRoute />}>
-              <Route exact path="/explore" element={<Explore />} />
-            </Route>
-
-            <Route element={<PrivateRoute />}>
-              <Route exact path="/messages" element={<Messages />} />
-            </Route>
-
-            <Route element={<PrivateRoute />}>
-              <Route path="/settings" element={<Settings />}></Route>
-            </Route>
-
-            <Route element={<PrivateRoute />}>
-              <Route
-                path="/more/:searchValue"
-                element={<MoreResults />}
-              ></Route>
-            </Route>
-
-            <Route element={<AdminRoute />}>
-              <Route path="/admin" element={<Admin />}></Route>
-            </Route>
-
-            <Route element={<AdminRoute />}>
-              <Route path="/admin/user/:id" element={<AdminSettings />}></Route>
-            </Route>
-            {/* <Route path="*" element={<PageNotFound />} /> */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        ) : (
-          <BlockedUser />
-        )}
+          {/* Fallback routes */}
+          <Route path="*" element={<Navigate to={user.isLoggedIn ? "/" : "/login"} />} />
+        </Routes>
       </main>
-      <footer>
-        <Footer></Footer>
-      </footer>
+      <Footer />
     </div>
   );
 }
