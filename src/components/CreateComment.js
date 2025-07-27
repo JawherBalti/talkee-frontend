@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { createComment } from '../features/user/userSlice';
+import { createComment } from '../features/post/postSlice';
 import LoadingSmall from './LoadingSmall';
 
 function CreateComment(props) {
-  const imageApi = 'http://localhost:3001/images/';
 
   const [comment, setComment] = useState('');
 
@@ -20,10 +19,7 @@ function CreateComment(props) {
         createComment({
           PostId: props.post.id,
           comment,
-          // Include current user data for optimistic update
-          UserId: currentUser.id,
-          firstName: currentUser.firstName,
-          photoUrl: currentUser.photoUrl,
+          ...currentUser // Pass all user data needed
         })
       );
       setComment('');
