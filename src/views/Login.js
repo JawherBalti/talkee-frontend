@@ -1,6 +1,6 @@
 import  { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { login } from '../features/user/userSlice';
 import LoadingSmall from '../components/LoadingSmall';
 import LoadingLogo from '../components/LoadingLogo';
@@ -16,10 +16,18 @@ function Login() {
 
   const user = useSelector((state) => state.user);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   useEffect(() => {
     socket?.current?.on('disconnect');
   }, [user, socket]);
+
+  useEffect(() => {
+    // Check if already logged in
+    if (user.isLoggedIn) {
+      navigate('/');
+    }
+  }, [user.isLoggedIn, navigate]);
 
   const submitHandler = (e) => {
     e.preventDefault();
@@ -102,7 +110,6 @@ function Login() {
       </div>
     </div>
     </div>
-
   );
 }
 
