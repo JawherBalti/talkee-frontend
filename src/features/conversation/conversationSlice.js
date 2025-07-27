@@ -4,6 +4,12 @@ import axios from 'axios';
 const initialState = {
   conversations: [],
   oneConversation: [],
+  pagination: {
+    currentPage: 1,
+    totalPages: 1,
+    totalMessages: 0,
+    hasMore: true,
+  },
   conversationsLoading: false,
   conversationLoading: false,
   conversationCreatedLoading: false,
@@ -57,9 +63,22 @@ const conversationSlice = createSlice({
     builder.addCase(getOneConversation.pending, (state) => {
       state.conversationsLoading = true;
     });
+    // In conversationSlice.js
     builder.addCase(getOneConversation.fulfilled, (state, action) => {
       state.conversationsLoading = false;
-      state.oneConversation = action.payload;
+      
+      // For first page, replace all messages
+      // For subsequent pages, prepend the older messages
+      state.oneConversation = action.payload.page === 1
+        ? action.payload.messages
+        : [...action.payload.messages, ...state.oneConversation];
+      
+      state.pagination = {
+        currentPage: action.payload.page,
+        totalPages: action.payload.totalPages,
+        totalMessages: action.payload.total,
+        hasMore: action.payload.page < action.payload.totalPages,
+      };
       state.error = '';
     });
     builder.addCase(getOneConversation.rejected, (state, action) => {
@@ -133,13 +152,9 @@ export const createConversations = createAsyncThunk(
 
 export const getOneConversation = createAsyncThunk(
   'conversation/getConversations',
-  async (otherUserId) => {
-    return axios
-      .get('http://localhost:3001/api/conversation/' + otherUserId)
-      .then((res) => {
-        return res.data;
-      })
-      .catch((err) => err.response.data.message);
+  async ({ id, page = 1, limit = 5 }) => {
+    const response = await axios.get(`http://localhost:3001/api/conversation/${id}?page=${page}&limit=${limit}`);
+    return response.data;
   }
 );
 
