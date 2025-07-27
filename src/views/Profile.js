@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useParams } from 'react-router-dom';
-import CreateComment from '../components/CreateComment';
-import LoadingSmall from '../components/LoadingSmall';
 import PostHeader from '../components/PostHeader';
 import ToggleComments from '../components/ToggleComments';
 import { getUserPosts } from '../features/post/postSlice';
@@ -13,7 +11,6 @@ import {
   unfollowUser,
 } from '../features/user/userSlice';
 
-const imageApi = 'http://localhost:3001/images/';
 const timestampOption = {
   year: 'numeric',
   month: 'short',
@@ -83,8 +80,9 @@ function Profile() {
                 <h2 className="profile-header-name">
                   {user.user.user.firstName + ' ' + user.user.user.familyName}
                 </h2>
-                <span>{user.user.user.followers.length} Follower(s)</span>
               </div>
+                <span>{user.user.user.followersCount} Follower(s)</span>
+                <span>{user.user.user.followingCount} Following</span>
             </div>
             {parseInt(param.id) !== user.userLogin.user.id ? (
               <>
@@ -100,7 +98,7 @@ function Profile() {
                 ) : (
                   <button
                     onClick={() => unfollow(param.id)}
-                    className="secondary"
+                    className="danger"
                   >
                     Unfollow
                   </button>
@@ -173,7 +171,7 @@ function Profile() {
           }
           <div className={!isMobile ? "user-posts" : "user-posts-mobile"}>
             {/* {!post.userPostsLoading ? ( */}
-            <div>
+            <div style={{width: '100%'}}>
               {post.userPosts.length ? (
                 <>
                 {post.userPosts.map((p) => (
