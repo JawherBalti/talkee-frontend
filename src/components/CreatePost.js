@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { createPost } from '../features/user/userSlice';
+import { createPost } from '../features/post/postSlice';
 import LoadingSmall from './LoadingSmall';
 
 function CreatePost() {
