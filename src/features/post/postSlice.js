@@ -15,6 +15,7 @@ const initialState = {
   comment: '',
   error: '',
   postMessage: '',
+  postLoading: false,
   postRecievedMessage: '',
   followedPostsMessage: '',
   currentPage: 1,
@@ -74,72 +75,104 @@ const postSlice = createSlice({
       state.error = action.error.message;
     });
 
-// Optimistically add comment
-builder.addCase(createComment.pending, (state, action) => {
-  const { PostId, comment } = action.meta.arg;
-  const tempComment = {
-    id: `temp-${Date.now()}`,
-    message: comment,
-    PostId,
-    pending: true,
-    createdAt: new Date().toISOString(),
-    User: state.user.userLogin.user, // Add current user info
-    UserId: state.user.userLogin.user.id
-  };
+    // Optimistically add comment
+    builder.addCase(createComment.pending, (state, action) => {
+      const { PostId, comment } = action.meta.arg;
+      const currentUser = action.meta.arg; // User data passed from component
+      
+      const tempComment = {
+        id: `temp-${Date.now()}`,
+        message: comment,
+        PostId,
+        pending: true,
+        createdAt: new Date().toISOString(),
+        User: currentUser,
+        UserId: currentUser.id
+      };
 
-  // Helper function to add to any post array
-  const addTempComment = (postArray) => {
-    const post = postArray.find(p => p.id === PostId);
-    if (post) {
-      post.Comments = post.Comments || [];
-      post.Comments.unshift(tempComment);
-    }
-  };
+      // Add to all relevant post arrays
+      const addTempComment = (posts) => {
+        return posts.map(post => {
+          if (post.id === PostId) {
+            return {
+              ...post,
+              Comments: [tempComment, ...(post.Comments || [])]
+            };
+          }
+          return post;
+        });
+      };
 
-  addTempComment(state.posts);
-  addTempComment(state.userPosts);
-  addTempComment(state.followedPosts);
-});
+      state.posts = addTempComment(state.posts);
+      state.followedPosts = addTempComment(state.followedPosts);
+      state.userPosts = addTempComment(state.userPosts);
+    });
 
-builder.addCase(createComment.fulfilled, (state, action) => {
-  const { comment: createdComment } = action.payload;
-  const PostId = createdComment.PostId;
+    builder.addCase(createComment.fulfilled, (state, action) => {
+      const { comment: createdComment } = action.payload;
+      const PostId = createdComment.PostId;
 
-  // Helper to replace temp comment
-  const confirmComment = (postArray) => {
-    const post = postArray.find(p => p.id === PostId);
-    if (post?.Comments) {
-      const index = post.Comments.findIndex(c => c.pending);
-      if (index !== -1) {
-        post.Comments[index] = {
-          ...createdComment,
-          pending: false,
-          User: createdComment.User // Ensure user data is included
-        };
-      } else {
-        // If no pending comment found, just add the new one
-        post.Comments.unshift(createdComment);
+      const updateComments = (posts) => {
+        return posts.map(post => {
+          if (post.id === PostId) {
+            // Remove temp comment and add real one
+            const filteredComments = (post.Comments || []).filter(
+              c => !c.pending
+            );
+            return {
+              ...post,
+              Comments: [createdComment, ...filteredComments]
+            };
+          }
+          return post;
+        });
+      };
+
+      state.posts = updateComments(state.posts);
+      state.followedPosts = updateComments(state.followedPosts);
+      state.userPosts = updateComments(state.userPosts);
+    });
+
+    builder.addCase(createComment.rejected, (state, action) => {
+      const { PostId } = action.meta.arg;
+      
+      const removeTempComment = (posts) => {
+        return posts.map(post => {
+          if (post.id === PostId) {
+            return {
+              ...post,
+              Comments: (post.Comments || []).filter(c => !c.pending)
+            };
+          }
+          return post;
+        });
+      };
+
+      state.posts = removeTempComment(state.posts);
+      state.followedPosts = removeTempComment(state.followedPosts);
+      state.userPosts = removeTempComment(state.userPosts);
+    });
+
+    builder.addCase(createPost.pending, (state) => {
+      state.postLoading = true;
+    });
+    builder.addCase(createPost.fulfilled, (state, action) => {
+      state.postLoading = false;
+      state.postMessage = action.payload.message;
+      
+      // Add the new post to the beginning of the followedPosts array
+      if (action.payload.post) {
+        state.followedPosts = [action.payload.post, ...(state.followedPosts || [])];
       }
-    }
-  };
-
-  confirmComment(state.posts);
-  confirmComment(state.userPosts);
-  confirmComment(state.followedPosts);
-});
-    // builder.addCase(createPost.pending, (state) => {
-    //   state.postLoading = true;
-    // });
-    // builder.addCase(createPost.fulfilled, (state, action) => {
-    //   state.postLoading = false;
-    //   state.postMessage = action.payload;
-    //   state.error = '';
-    // });
-    // builder.addCase(createPost.rejected, (state, action) => {
-    //   state.postLoading = false;
-    //   state.postMessage = '';
-    //   state.error = action.error.message;
-    // });
+      console.log(state.followedPosts)
+      
+      state.error = '';
+    });
+    builder.addCase(createPost.rejected, (state, action) => {
+      state.postLoading = false;
+      state.postMessage = '';
+      state.error = action.error.message;
+    });
 
     builder.addCase(deletePost.pending, (state) => {
       state.deleteLoading = true;
@@ -292,34 +325,42 @@ builder.addCase(createComment.fulfilled, (state, action) => {
   },
 });
 
+// In postSlice.js
 export const createComment = createAsyncThunk(
-  'comment/createComment',
+  'post/createComment',
   async (formData, { getState }) => {
-    const { comment, PostId } = formData;
+    const { PostId, comment } = formData;
+    const state = getState();
+    const currentUser = state.user.userLogin.user;
+    
     try {
       const response = await axios.post(
         `http://localhost:3001/api/comment/${PostId}`,
         { message: comment }
       );
-      return response.data;
+      
+      return {
+        ...response.data,
+        user: currentUser
+      };
     } catch (err) {
-      // Return a standardized error object
       throw new Error(err.response?.data?.message || 'Failed to create comment');
     }
   }
 );
 
-// export const createPost = createAsyncThunk(
-//   'post/createPost',
-//   async (formData) => {
-//     return axios
-//       .post('http://localhost:3001/api/post', formData)
-//       .then((res) => {
-//         return res.data;
-//       })
-//       .catch((err) => err.response.data.message);
-//   }
-// );
+export const createPost = createAsyncThunk(
+  'post/createPost',
+  async (formData, { rejectWithValue }) => {
+    try {
+      const response = await axios.post('http://localhost:3001/api/post', formData);
+      return response.data;  // Will now include the full post object
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to create post');
+    }
+  }
+);
+
 export const modifyPost = createAsyncThunk(
   'post/modifyPost',
   async (updateObj, { rejectWithValue }) => {
