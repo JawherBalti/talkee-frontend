@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, getUser } from '../features/user/userSlice';
+import { getCurrentUser, getUser, logout } from '../features/user/userSlice';
 import { getFollowedPosts } from '../features/post/postSlice';
 import PostHeader from '../components/PostHeader';
 import CreatePost from '../components/CreatePost';
@@ -17,7 +17,6 @@ import FollowSuggestions from '../components/FollowSuggestions';
 import Links from '../components/Links';
 
 let firstRender = true;
-const imageApi = 'http://localhost:3001/images/';
 
 function Home() {
   const user = useSelector((state) => state.user);
@@ -37,6 +36,33 @@ function Home() {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+let isLoggingOut = false;
+
+axios.interceptors.response.use(
+  response => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Skip if already logging out or if it's a logout request
+    if (isLoggingOut || originalRequest.url.includes('/logout')) {
+      return Promise.reject(error);
+    }
+
+    if (error.response?.status === 401) {
+      isLoggingOut = true;
+      try {
+        await dispatch(logout());
+        navigate('/login'); // Redirect to login page
+      } catch (err) {
+        console.error("Logout failed:", err);
+      } finally {
+        isLoggingOut = false;
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
   const refreshToken = async () => {
     try {
@@ -59,6 +85,7 @@ function Home() {
 
   useEffect(() => {
     if (user.userLogin.user) {
+      console.log(user.userLogin)
       dispatch(getUser(user.userLogin.user.id));
       dispatch(getCurrentUser(user.userLogin.user.id));
     }
