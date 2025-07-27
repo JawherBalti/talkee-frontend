@@ -39,7 +39,7 @@ function PostFooter(props) {
           aria-label={likes?.map(like => like.UserId).includes(props.user.userLogin.user.id) ? 'Unlike' : 'Like'}
         >
           <i className="fas fa-heart"></i>
-          {likes.length > 0 && <span className="like-count">{likes.length}</span>}
+          {likes?.length > 0 && <span className="like-count">{likes.length}</span>}
         </button>
         
         <button 
