@@ -13,13 +13,17 @@ import {
 import {
   getAllUsers,
   getCurrentUser,
-  getUser,
+  getFollowedUsers,
+  getSelectedUser,
 } from '../features/user/userSlice';
+import { useLocation } from 'react-router-dom';
 
-const imageApi = 'http://localhost:3001/images/';
 let userSelectedId = 0;
 
 function Messages() {
+  const location = useLocation();
+  const { selectedUserId } = location.state || {};
+
   const user = useSelector((state) => state.user);
   const conversation = useSelector((state) => state.conversation);
   
@@ -28,19 +32,96 @@ function Messages() {
   const [newMessage, setNewMessage] = useState('');
   const [userSelected, setUserSelected] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showContacts, setShowContacts] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const [followedUsersPage, setFollowedUsersPage] = useState(1);
+  const followedUsers = useSelector((state) => state.user.followedUsers);
+  const followedUsersPagination = useSelector((state) => state.user.followedUsersPagination);
+  const getFollowedUsersLoading = useSelector((state) => state.user.getFollowedUsersLoading);
+
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   
-  const scrollRef = useRef();
   const socket = useRef();
   const dispatch = useDispatch();
+
+  // Add this useEffect to handle the selected user from navigation
+  useEffect(() => {
+      if (selectedUserId) {
+          const friend = user.users.find(u => u.id === selectedUserId);
+          if (friend) {
+              handleOpenConversation(friend);
+          }
+      }
+  }, [selectedUserId, user.users]);
+
+  useEffect(() => {
+    dispatch(getFollowedUsers({ 
+      userId: user.userLogin.user.id, 
+      page: 1 
+    }));
+  }, [dispatch, user.userLogin.user.id]);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     const container = document.querySelector('.messages-container');
     if (container) {
       container.scrollTop = container.scrollHeight;
+    }
+  };
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (conversation.pagination.currentPage === 1) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [conversation.oneConversation, conversation.pagination.currentPage]);
+
+
+  const loadMoreFollowedUsers = () => {
+    if (!getFollowedUsersLoading && followedUsersPagination.hasNextPage) {
+      const nextPage = followedUsersPage + 1;
+      dispatch(getFollowedUsers({ 
+        userId: user.userLogin.user.id, 
+        page: nextPage 
+      }));
+      setFollowedUsersPage(nextPage);
+    }
+  };
+
+  // Load more older messages
+  const loadMoreMessages = async () => {
+    if (loadingMore || !conversation.pagination.hasMore) return;
+    
+    // Save current scroll position
+    const container = messagesContainerRef.current;
+    const prevHeight = container.scrollHeight;
+    const prevScrollTop = container.scrollTop;
+    
+    setLoadingMore(true);
+    try {
+      const nextPage = conversation.pagination.currentPage + 1;
+      await dispatch(getOneConversation({
+        id: userSelectedId,
+        page: nextPage,
+        limit: 5
+      })).unwrap();
+      
+      // Maintain scroll position after loading
+      setTimeout(() => {
+        const container = document.querySelector('.messages-container');
+        if (container) {
+          container.scrollTo({
+            top: 0,
+            behavior: 'smooth' // Optional: adds smooth scrolling
+          });        
+        }
+      }, 0);
+    } catch (error) {
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -56,7 +137,7 @@ function Messages() {
   // Fetch unread counts from API
   const fetchUnreadCounts = async () => {
     try {
-      const response = await axios.get('http://localhost:3001/api/conversations/unread-counts');
+      const response = await axios.get('http://localhost:3001/api/conversation/unread-counts');
       const counts = {};
       response.data.forEach(item => {
         counts[item.otherUserId] = item.unreadCount;
@@ -118,8 +199,13 @@ function Messages() {
 
   // Handle opening a conversation
   const handleOpenConversation = (otherUser) => {
-    dispatch(getOneConversation(otherUser.id));
-    dispatch(getUser(otherUser.id));
+    dispatch(getOneConversation({
+      id: otherUser.id,
+      page: 1, // Always start with page 1 when opening a new conversation
+      limit: 5
+    }));
+    
+    dispatch(getSelectedUser(otherUser.id));
     dispatch(updateOneConversation(otherUser.id));
     setUserSelected(true);
     setNewMessage('');
@@ -259,38 +345,49 @@ function Messages() {
         </div>
         
         <div className="contacts-list">
-          {user.users
+          {followedUsers
             .filter(u => u.id !== user.userLogin.user.id)
-            .map(user => (
+            .map(friend => (
               <div 
-                className={`contact-card ${user.id === userSelectedId ? 'active' : ''}`}
-                key={user.id}
-                onClick={() => handleOpenConversation(user)}
+                className={`contact-card ${friend.id === userSelectedId ? 'active' : ''}`}
+                key={friend.id}
+                onClick={() => handleOpenConversation(friend)}
               >
                 <div className="avatar-container">
                   <img 
-                    src={user.photoUrl} 
-                    alt={user.firstName}
+                    src={friend.photoUrl} 
+                    alt={friend.firstName}
                     className="contact-avatar"
                   />
-                  <span className={`status-dot ${user.isOnline ? 'online' : ''}`}></span>
+                  <span className={`status-dot ${friend.isOnline ? 'online' : ''}`}></span>
                 </div>
                 
                 <div className="contact-info">
-                  <h4>{user.firstName} {user.familyName}</h4>
+                  <h4>{friend.firstName} {friend.familyName}</h4>
                   <p className="last-message">
-                    {getLastMessage(user.id)}
+                    {getLastMessage(friend.id)}
                   </p>
                 </div>
                 
-                {unreadCounts[user.id] > 0 && (
+                {unreadCounts[friend.id] > 0 && (
                   <span className="unread-badge">
-                    {unreadCounts[user.id] > 9 ? '9+' : unreadCounts[user.id]}
+                    {unreadCounts[friend.id] > 9 ? '9+' : unreadCounts[friend.id]}
                   </span>
                 )}
               </div>
             ))}
         </div>
+        {followedUsersPagination.hasNextPage && (
+          <div className="load-more-contacts">
+            <button 
+            className='load-more-btn'
+              onClick={loadMoreFollowedUsers}
+              disabled={getFollowedUsersLoading}
+            >
+              {getFollowedUsersLoading ? 'Loading...' : 'Load More Contacts'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Chat area */}
@@ -308,17 +405,17 @@ function Messages() {
               )}
               <div className="chat-partner">
                 <img 
-                  src={user.user.user?.photoUrl} 
-                  alt={user.user.user?.firstName}
+                  src={user?.selectedUser?.photoUrl} 
+                  alt={user?.selectedUser?.firstName}
                   className="chat-avatar"
                 />
                 <div>
-                  <h3>{user.user.user?.firstName} {user.user.user?.familyName}</h3>
+                  <h3>{user?.selectedUser?.firstName} {user?.selectedUser?.familyName}</h3>
                   <p className="status-text">
                     {isTyping ? (
                       <span className="typing-indicator">typing...</span>
                     ) : (
-                      user.user.user?.isOnline ? 'online' : 'offline'
+                      user?.selectedUser?.isOnline ? 'online' : 'offline'
                     )}
                   </p>
                 </div>
@@ -328,7 +425,25 @@ function Messages() {
               </button>
             </div>
 
-            <div onClick={() => setShowContacts(!showContacts)} className="messages-container" ref={scrollRef}>
+            <div onClick={() => setShowContacts(!showContacts)} className="messages-container" ref={messagesContainerRef}>
+
+              {/* "Show More" button at the bottom */}
+              {conversation.pagination.hasMore && (
+                <div className="show-more-container">
+                  <button 
+                    onClick={loadMoreMessages}
+                    disabled={loadingMore}
+                    className="show-more-btn"
+                  >
+                    {loadingMore ? (
+                      <><i className="fas fa-spinner fa-spin"></i> Loading...</>
+                    ) : (
+                      'Show Older Messages'
+                    )}
+                  </button>
+                </div>
+              )}
+              {/* Empty div for auto-scrolling to top */}
               {conversation.oneConversation.length > 0 ? (
                 conversation.oneConversation.map(msg => {
                   if (!msg) return null;
@@ -336,7 +451,7 @@ function Messages() {
                   const isSent = parseInt(msg.senderId) === user.userLogin.user.id;
                   const senderPhoto = isSent 
                     ? user.currentUser.user?.photoUrl 
-                    : user.user.user?.photoUrl;
+                    : user?.selectedUser?.photoUrl;
                   
                   return (
                     <div 
@@ -372,7 +487,7 @@ function Messages() {
                   <p>No messages yet. Say hello!</p>
                 </div>
               )}
-              <div ref={scrollRef} style={{ float: "left", clear: "both" }}></div>
+              <div ref={messagesEndRef} style={{ float: "left", clear: "both" }}></div>
             </div>
 
             <form className="message-input-area" onSubmit={handleSubmit}>
